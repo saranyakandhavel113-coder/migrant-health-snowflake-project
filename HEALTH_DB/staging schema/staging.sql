@@ -1,0 +1,161 @@
+CREATE OR REPLACE TABLE HEALTH_DB.STAGING.MIGRANT_PROFILES (
+    migrant_id STRING,
+    age INT,
+    gender STRING,
+    home_state STRING,
+    current_state STRING,
+    load_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE OR REPLACE TABLE HEALTH_DB.STAGING.MEDICAL_VISITS (
+    visit_id STRING,
+    migrant_id STRING,
+    visit_date DATE,
+    diagnosis STRING,
+    treatment STRING,
+    hospital_name STRING,
+    load_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE OR REPLACE TABLE HEALTH_DB.STAGING.LAB_REPORTS (
+    report_id STRING,
+    migrant_id STRING,
+    test_name STRING,
+    test_result STRING,
+    report_date DATE,
+    load_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE OR REPLACE TABLE HEALTH_DB.STAGING.VACCINATION_RECORDS (
+    record_id STRING,
+    migrant_id STRING,
+    vaccine_name STRING,
+    dose_number INT,
+    vaccination_date DATE,
+    load_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+truncate table HEALTH_DB.STAGING.MIGRANT_PROFILES;
+truncate table HEALTH_DB.STAGING.MEDICAL_VISITS;
+
+truncate table HEALTH_DB.STAGING.LAB_REPORTS;
+
+truncate table HEALTH_DB.STAGING.VACCINATION_RECORDS;
+
+
+
+INSERT INTO HEALTH_DB.STAGING.MIGRANT_PROFILES
+SELECT
+    migrant_id,
+    age,
+    UPPER(TRIM(gender)) AS gender,
+    INITCAP(TRIM(home_state)) AS home_state,
+    INITCAP(TRIM(current_state)) AS current_state,
+    CURRENT_TIMESTAMP
+FROM HEALTH_DB.RAW.STREAM_MIGRANT_PROFILES
+WHERE METADATA$ACTION = 'INSERT'
+  AND migrant_id IS NOT NULL;
+
+INSERT INTO HEALTH_DB.STAGING.MEDICAL_VISITS
+SELECT
+    visit_id,
+    migrant_id,
+    visit_date,
+    INITCAP(TRIM(diagnosis)) AS diagnosis,
+    INITCAP(TRIM(treatment)) AS treatment,
+    INITCAP(TRIM(hospital_name)) AS hospital_name,
+    CURRENT_TIMESTAMP
+FROM HEALTH_DB.RAW.STREAM_MEDICAL_VISITS
+WHERE METADATA$ACTION = 'INSERT'
+  AND visit_id IS NOT NULL;
+
+  SELECT * FROM HEALTH_DB.STAGING.MEDICAL_VISITS;
+
+
+
+INSERT INTO HEALTH_DB.STAGING.LAB_REPORTS
+SELECT
+    report_id,
+    migrant_id,
+    INITCAP(TRIM(test_name)) AS test_name,
+    INITCAP(TRIM(test_result)) AS test_result,
+    report_date,
+    CURRENT_TIMESTAMP
+FROM HEALTH_DB.RAW.STREAM_LAB_REPORTS
+WHERE METADATA$ACTION = 'INSERT'
+  AND report_id IS NOT NULL;
+
+
+
+INSERT INTO HEALTH_DB.STAGING.VACCINATION_RECORDS
+SELECT
+    record_id,
+    migrant_id,
+    INITCAP(TRIM(vaccine_name)) AS vaccine_name,
+    dose_number,
+    vaccination_date,
+    CURRENT_TIMESTAMP
+FROM HEALTH_DB.RAW.STREAM_VACCINATION_RECORDS
+WHERE METADATA$ACTION = 'INSERT'
+  AND record_id IS NOT NULL;
+
+
+
+
+
+CREATE OR REPLACE TASK HEALTH_DB.STAGING.TASK_RAW_TO_STAGING
+WAREHOUSE = PIPELINE_WH
+SCHEDULE = '5 MINUTE'
+AS
+BEGIN
+    -- Migrant Profiles
+    INSERT INTO HEALTH_DB.STAGING.MIGRANT_PROFILES
+    SELECT migrant_id, age, UPPER(TRIM(gender)), INITCAP(TRIM(home_state)), INITCAP(TRIM(current_state)), CURRENT_TIMESTAMP
+    FROM HEALTH_DB.RAW.STREAM_MIGRANT_PROFILES
+    WHERE METADATA$ACTION = 'INSERT' AND migrant_id IS NOT NULL;
+
+    -- Medical Visits
+    INSERT INTO HEALTH_DB.STAGING.MEDICAL_VISITS
+    SELECT visit_id, migrant_id, visit_date, INITCAP(TRIM(diagnosis)), INITCAP(TRIM(treatment)), INITCAP(TRIM(hospital_name)), CURRENT_TIMESTAMP
+    FROM HEALTH_DB.RAW.STREAM_MEDICAL_VISITS
+    WHERE METADATA$ACTION = 'INSERT' AND visit_id IS NOT NULL;
+
+    -- Lab Reports
+    INSERT INTO HEALTH_DB.STAGING.LAB_REPORTS
+    SELECT report_id, migrant_id, INITCAP(TRIM(test_name)), INITCAP(TRIM(test_result)), report_date, CURRENT_TIMESTAMP
+    FROM HEALTH_DB.RAW.STREAM_LAB_REPORTS
+    WHERE METADATA$ACTION = 'INSERT' AND report_id IS NOT NULL;
+
+    -- Vaccination Records
+    INSERT INTO HEALTH_DB.STAGING.VACCINATION_RECORDS
+    SELECT record_id, migrant_id, INITCAP(TRIM(vaccine_name)), dose_number, vaccination_date, CURRENT_TIMESTAMP
+    FROM HEALTH_DB.RAW.STREAM_VACCINATION_RECORDS
+    WHERE METADATA$ACTION = 'INSERT' AND record_id IS NOT NULL;
+END;
+
+
+ALTER TASK HEALTH_DB.STAGING.TASK_RAW_TO_STAGING RESUME;
+
+SHOW TASKS IN SCHEMA HEALTH_DB.STAGING;
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  
+
+
+
+
